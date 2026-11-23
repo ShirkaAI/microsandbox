@@ -306,6 +306,12 @@ impl LocalBackendBuilder {
         self
     }
 
+    /// Override the directory used for ephemeral runtime artifacts.
+    pub fn run_dir(mut self, path: impl Into<PathBuf>) -> Self {
+        self.config.paths.run_mut(path.into());
+        self
+    }
+
     /// Override the sandboxes directory.
     pub fn sandboxes_dir(mut self, path: impl Into<PathBuf>) -> Self {
         self.config.paths.sandboxes_mut(path.into());
@@ -1833,6 +1839,33 @@ mod tests {
             merged.deployment_profile,
             Some(DeploymentProfile::MultiTenant)
         );
+    }
+
+    #[test]
+    fn builder_run_dir_overrides_persisted_path_and_preserves_other_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let config_path = temp.path().join("config.json");
+        let run_dir = temp.path().join("runtime");
+        let sandboxes_dir = temp.path().join("sandboxes");
+        let base = GlobalConfig {
+            paths: crate::config::PathsConfig {
+                run: Some(temp.path().join("old-runtime")),
+                sandboxes: Some(sandboxes_dir.clone()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        std::fs::write(&config_path, serde_json::to_vec(&base).unwrap()).unwrap();
+        let backend = LocalBackend::builder()
+            .config_path(&config_path)
+            .managed_config_path(config_path.with_file_name("managed.json"))
+            .run_dir(&run_dir)
+            .build_lazy()
+            .unwrap();
+
+        assert_eq!(backend.config().run_dir(), run_dir);
+        assert_eq!(backend.config().sandboxes_dir(), sandboxes_dir);
     }
 
     #[test]

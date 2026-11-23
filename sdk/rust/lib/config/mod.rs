@@ -280,6 +280,9 @@ pub struct PathsConfig {
     /// Cache directory.
     pub cache: Option<PathBuf>,
 
+    /// Ephemeral runtime artifacts directory.
+    pub run: Option<PathBuf>,
+
     /// Per-sandbox state directory.
     pub sandboxes: Option<PathBuf>,
 
@@ -525,7 +528,10 @@ impl GlobalConfig {
 
     /// Resolve the `run` directory used for ephemeral runtime artifacts.
     pub fn run_dir(&self) -> PathBuf {
-        self.home().join(microsandbox_utils::RUN_SUBDIR)
+        self.paths
+            .run
+            .clone()
+            .unwrap_or_else(|| self.home().join(microsandbox_utils::RUN_SUBDIR))
     }
 
     /// Resolve the optional diagnostic file under `run/metrics` that records
@@ -776,6 +782,7 @@ mod tests {
                 "agentd": "/configured/agentd",
                 "libkrunfw": "/configured/libkrunfw",
                 "cache": "/configured/cache",
+                "run": "/configured/run",
                 "sandboxes": "/configured/sandboxes",
                 "volumes": "/configured/volumes",
                 "snapshots": "/configured/snapshots",
@@ -845,6 +852,7 @@ mod tests {
             &patch.paths.agentd,
             &patch.paths.libkrunfw,
             &patch.paths.cache,
+            &patch.paths.run,
             &patch.paths.sandboxes,
             &patch.paths.volumes,
             &patch.paths.snapshots,
@@ -1352,6 +1360,33 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(cfg.sandboxes_dir(), PathBuf::from("/custom/sandboxes"));
+    }
+
+    #[test]
+    fn test_run_dir_defaults_to_home_run() {
+        let cfg = GlobalConfig {
+            home: Some(PathBuf::from("/custom/home")),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            cfg.run_dir(),
+            PathBuf::from("/custom/home").join(microsandbox_utils::RUN_SUBDIR)
+        );
+    }
+
+    #[test]
+    fn test_run_dir_override() {
+        let cfg = GlobalConfig {
+            home: Some(PathBuf::from("/custom/home")),
+            paths: PathsConfig {
+                run: Some(PathBuf::from("/custom/run")),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(cfg.run_dir(), PathBuf::from("/custom/run"));
     }
 
     #[test]
